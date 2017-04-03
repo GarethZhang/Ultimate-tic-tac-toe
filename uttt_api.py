@@ -64,7 +64,11 @@ class TictactoeState(StateSpace):
         @param marks: A dictionary where the keys are the coordinates of each position, and the value is the type of marks (EMPTY:-1, X:1, or O:0) at the position.
         """
         StateSpace.__init__(self, parent, action)
+        self.action = action
         self.marks = marks
+        if parent != None and action != (0,-1):
+            self.marks = copy.deepcopy(parent.marks)
+            self.marks[action[0]] = action[1]
     
     def successors(self, player):
         """
@@ -105,6 +109,9 @@ class TictactoeState(StateSpace):
             return X
         else:
             return -1
+
+    def avail_marks(self):
+        return [i for i in range(1, 10) if self.marks[i] == -1]
 
     def state_string(self):
         """
@@ -165,7 +172,13 @@ class UtttState(StateSpace):
                        and the value is a TictactoeState at the position.
         """
         StateSpace.__init__(self, parent, action)
+        self.action = action
         self.boards = boards
+        if parent != None and action != (0, 0, -1):
+            self.boards = copy.deepcopy(parent.boards)
+            stateMark = copy.deepcopy(self.boards.get(action[0]).marks)
+            stateMark[action[1]] = action[2]
+            self.boards[action[0]] = TictactoeState(marks = stateMark)
     
     def successors(self):
         """
@@ -229,6 +242,9 @@ class UtttState(StateSpace):
         else:
             return -1
 
+    def avail_marks(self):
+        return [(i, j) for i in range(1, 10) for j in self.boards[i].avail_marks()]
+
     def state_string(self):
         """
         Return a string representation of a state that can be printed to stdout.
@@ -271,3 +287,11 @@ class UtttState(StateSpace):
         print("ACTION was " + str(act) + " in board " + str(board)
               + " at position " + str(pos))
         print(self.state_string())
+
+if __name__ == "__main__":
+    # default empty board
+    init_state = UtttState()
+    second_state = UtttState(parent=init_state, action=(1,1,1))
+
+    second_state.print_state()
+    print(len(second_state.successors()))
