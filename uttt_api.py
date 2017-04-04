@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 
 class StateSpace:
     '''Abstract class for defining State spaces for search routines'''
@@ -69,6 +70,37 @@ class TictactoeState(StateSpace):
         if parent != None and action != (0,-1):
             self.marks = copy.deepcopy(parent.marks)
             self.marks[action[0]] = action[1]
+        self.heuristic = self.calcHeuristic()
+
+    def calcHeuristic(self):
+        # add heuristic score if forms a stright line
+        tripleList = np.array([[1,2,3],[4,5,6],[7,8,9],[1,4,7],[2,5,8],[3,6,9],[1,5,9],[3,5,7]])
+        doubleList = np.array([0,1])
+        marksToList = np.array([self.marks[i] for i in range(1,10)])
+        heuristic = 0
+        for indexList in tripleList:
+            if marksToList[indexList-1].all() == X:
+                heuristic -= 1
+                break
+            elif marksToList[indexList-1].all() == 0:
+                heuristic += 1
+                break
+
+        # add heuristic score if forms a stright line of two
+        for indexList in tripleList:
+            if marksToList[indexList-1][0] == X and marksToList[indexList-1][1] == -1 and marksToList[indexList-1][2] == X:
+                heuristic -= 1
+            elif marksToList[indexList-1][0] == -1 and marksToList[indexList-1][1] == X and marksToList[indexList-1][2] == X:
+                heuristic -= 1
+            elif marksToList[indexList-1][0] == X and marksToList[indexList-1][1] == X and marksToList[indexList-1][2] == -1:
+                heuristic -= 1
+            elif marksToList[indexList-1][0] == 0 and marksToList[indexList-1][1] == -1 and marksToList[indexList-1][2] == 0:
+                heuristic += 1
+            elif marksToList[indexList-1][0] == -1 and marksToList[indexList-1][1] == 0 and marksToList[indexList-1][2] == 0:
+                heuristic += 1
+            elif marksToList[indexList-1][0] == 0 and marksToList[indexList-1][1] == 0 and marksToList[indexList-1][2] == -1:
+                heuristic += 1
+        return heuristic
     
     def successors(self, player):
         """
@@ -173,12 +205,20 @@ class UtttState(StateSpace):
         """
         StateSpace.__init__(self, parent, action)
         self.action = action
+        self.parent = parent
         self.boards = boards
+        self.heuristic = 0
         if parent != None and action != (0, 0, -1):
             self.boards = copy.deepcopy(parent.boards)
             stateMark = copy.deepcopy(self.boards.get(action[0]).marks)
             stateMark[action[1]] = action[2]
             self.boards[action[0]] = TictactoeState(marks = stateMark)
+            self.heuristic = parent.heuristic + self.calcHeuristic()
+
+    def calcHeuristic(self):
+        minus_ = self.parent.boards[self.action[0]].calcHeuristic()
+        plus_ = self.boards[self.action[0]].calcHeuristic()
+        return plus_ - minus_
     
     def successors(self):
         """
