@@ -94,8 +94,24 @@ def getMove(utttState, searchDepth=10, timeout=10):
 def getMCMove(utttState, searchWidth=10, searchDepth=10, timeout=10):
     startTime = time.time()
     endTime = startTime + timeout
-    prob = [monteCarlo(x, searchWidth, searchDepth, endTime) for x in utttState.successors()]
-    return utttState.successors()[np.argmax(prob)].action
+    childSize = len(utttState.successors())
+    meanPayout = [1] * childSize
+    plays = [1] * childSize
+    storeState = copy.deepcopy(utttState)
+    for i in range(searchWidth):
+        utttState = copy.deepcopy(storeState)
+        index = int(np.random.randint(0, childSize-1, 1))
+        utttState = utttState.successors()[index]
+        for j in range(searchDepth):
+            utttState = random.choice(utttState.successors())
+            if (endTime - time.time()) < 0.5:
+                break
+        plays[index] += 1
+        meanPayout[index] += utttState.heuristic
+    meanPayout = np.int64(np.array(meanPayout) / np.array(plays))
+    UCB = meanPayout + np.sqrt(2 * np.log(plays) / np.sum(plays))
+    nextState = copy.deepcopy(storeState.successors()[np.argmax(UCB)])
+    return nextState.action
 
 def initRandomBoard(randomDepth):
     randomState = UtttState()
@@ -123,5 +139,5 @@ if __name__ == "__main__":
     randomS.print_state()
     print("Possible number of moves: " + str(len(randomS.successors())))
     # action = getMove(randomS, searchDepth=10, timeout=timeout)
-    action = getMCMove(randomS)
+    action = getMCMove(randomS, searchWidth=100, searchDepth=10, timeout=timeout)
     print("Selected move: " + str(action))
