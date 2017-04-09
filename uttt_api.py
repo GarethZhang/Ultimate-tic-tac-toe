@@ -410,6 +410,9 @@ class MonteCarlo(object):
                 self.wins[(player, state)] += 1
 
     def get_play(self):
+        # make next move in the central board if given an empty board
+        if self.utttState.state_string() == UtttState().state_string():
+            return random.choice([(5, i, 0) for i in range(1,10)])
         self.max_depth = 0
         state = self.states[-1]
         player = self.utttState.currentPlayer
@@ -431,8 +434,6 @@ class MonteCarlo(object):
         # time elapsed.
         print(games, self.nodes, datetime.datetime.utcnow() - begin)
 
-        for S in moves_states:
-            print(self.wins.get((S.action, S.state_string())))
         # Pick the move with the highest percentage of wins.
         percent_wins, move = max(
             (self.wins.get((S.action, S.state_string()), 0) /

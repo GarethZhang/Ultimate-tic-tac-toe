@@ -1,5 +1,6 @@
 import numpy as np
 import random
+import datetime
 import time
 from uttt_api import *
 
@@ -27,13 +28,50 @@ timeout = 10
 num_states = 0
 states = []
 
+# # compute score of current node using minimax
+# def miniMax(utttState, searchDepth, alpha, beta, endTime):
+#     global num_states
+#     num_states += 1
+#     if (endTime - time.time()) < 0.5:
+#         return (alpha, beta)
+#     # print("State: " + str(num_states))
+#     # if UTTT has been solved
+#     if utttState.goal_state() == 0:
+#         print("Goal state: MAX")
+#         return (np.inf, beta)
+#     elif utttState.goal_state() == X:
+#         print("Goal state: MIN")
+#         return (alpha, -np.inf)
+#
+#     # apply minimax
+#     ChildList = utttState.successors()
+#     currPlayer = utttState.action[2]
+#     if currPlayer == 0:
+#         # if minimax has expanded beyond searchDepth
+#         if searchDepth == 0:
+#             # print("Player0: " + str(utttState.heuristic))
+#             return (utttState.heuristic, beta)
+#         for x in ChildList:
+#             alpha = max(alpha, miniMax(x, searchDepth - 1, alpha, beta, endTime)[1])
+#             # beta = min(beta, miniMax(x, searchDepth - 1, alpha, beta)[1])
+#             if beta <= alpha:
+#                 break
+#         return (alpha, beta)
+#     else:
+#         # if minimax has expanded beyond searchDepth
+#         if searchDepth == 0:
+#             return (alpha, utttState.heuristic)
+#         for x in ChildList:
+#             # alpha = max(alpha, miniMax(x, searchDepth - 1, alpha, beta)[0])
+#             beta = min(beta, miniMax(x, searchDepth - 1, alpha, beta, endTime)[0])
+#             if beta <= alpha:
+#                 break
+#         return (alpha, beta)
+
 # compute score of current node using minimax
-def miniMax(utttState, searchDepth, alpha, beta, endTime):
+def miniMax(utttState, searchDepth, alpha, beta):
     global num_states
     num_states += 1
-    if (endTime - time.time()) < 0.5:
-        return (alpha, beta)
-    # print("State: " + str(num_states))
     # if UTTT has been solved
     if utttState.goal_state() == 0:
         print("Goal state: MAX")
@@ -44,15 +82,13 @@ def miniMax(utttState, searchDepth, alpha, beta, endTime):
 
     # apply minimax
     ChildList = utttState.successors()
-    currPlayer = utttState.action[2]
-    if currPlayer == 0:
+    lastPlayer = utttState.action[2]
+    if lastPlayer == 0:
         # if minimax has expanded beyond searchDepth
         if searchDepth == 0:
-            # print("Player0: " + str(utttState.heuristic))
             return (utttState.heuristic, beta)
         for x in ChildList:
-            alpha = max(alpha, miniMax(x, searchDepth - 1, alpha, beta, endTime)[1])
-            # beta = min(beta, miniMax(x, searchDepth - 1, alpha, beta)[1])
+            alpha = max(alpha, miniMax(x, searchDepth - 1, alpha, beta)[1])
             if beta <= alpha:
                 break
         return (alpha, beta)
@@ -61,106 +97,70 @@ def miniMax(utttState, searchDepth, alpha, beta, endTime):
         if searchDepth == 0:
             return (alpha, utttState.heuristic)
         for x in ChildList:
-            # alpha = max(alpha, miniMax(x, searchDepth - 1, alpha, beta)[0])
-            beta = min(beta, miniMax(x, searchDepth - 1, alpha, beta, endTime)[0])
+            beta = min(beta, miniMax(x, searchDepth - 1, alpha, beta)[0])
             if beta <= alpha:
                 break
         return (alpha, beta)
 
-def monteCarlo(utttState, searchWidth, searchDepth, endTime):
-    score = []
-    storeState = copy.deepcopy(utttState)
-    for i in range(searchWidth):
-        utttState = copy.deepcopy(storeState)
-        for j in range(searchDepth):
-            utttState = random.choice(utttState.successors())
-        score.append(utttState.heuristic)
-    return np.average(score)
-
 def getMove(utttState, searchDepth=10, timeout=10):
     nextState = None
-    cost = -np.inf
-    startTime = time.time()
-    endTime = startTime + timeout
+    alphaScore = -np.inf
+    betaScore = np.inf
+    startTime = datetime.datetime.utcnow()
     for x in utttState.successors():
-        print(x.action)
-        alpha = miniMax(x, searchDepth, -np.inf, np.inf, endTime)[0]
-        print("Possible move cost: " + str(alpha))
-        if cost < alpha:
-            nextState = x
-            cost = alpha
-    return nextState.action
-
-def getMCMove(utttState, searchWidth=10, searchDepth=10, timeout=10):
-    # set timeout bound
-    startTime = time.time()
-    endTime = startTime + timeout
-
-    # initialize variables to store statistics
-    plays = {}
-    wins = {}
-
-    # Childnode of current state
-    childSize = len(utttState.successors())
-    meanPayout = [1] * childSize
-    plays = [1] * childSize
-    storeState = copy.deepcopy(utttState)
-    for i in range(searchWidth):
-        utttState = copy.deepcopy(storeState)
-        index = int(np.random.randint(0, childSize-1, 1))
-        utttState = utttState.successors()[index]
-        for j in range(searchDepth):
-            utttState = random.choice(utttState.successors())
-            if (endTime - time.time()) < 0.5:
-                break
-        plays[index] += 1
-        meanPayout[index] += utttState.heuristic
-    meanPayout = np.int64(np.array(meanPayout) / np.array(plays))
-    UCB = meanPayout + np.sqrt(2 * np.log(plays) / np.sum(plays))
-    nextState = copy.deepcopy(storeState.successors()[np.argmax(UCB)])
+        if datetime.datetime.utcnow() - startTime > datetime.timedelta(seconds=timeout):
+            break
+        # print(x.action)
+        if x.currentPlayer==0:
+            alpha = miniMax(x, searchDepth, -np.inf, np.inf)[0]
+            # print("Possible move cost: " + str(alpha))
+            if alphaScore < alpha:
+                nextState = x
+                alphaScore = alpha
+        else:
+            beta = miniMax(x, searchDepth, -np.inf, np.inf)[1]
+            # print("Possible move cost: " + str(beta))
+            if betaScore > beta:
+                nextState = x
+                betaScore = beta
     return nextState.action
 
 def initRandomBoard(randomDepth):
     randomState = UtttState()
-    initBoard = int(np.random.randint(1, 9, 1))
-    initMove = int(np.random.randint(1, 9, 1))
-    randomState = UtttState(parent=randomState, action=(initBoard, initMove, 0))
-    print("step " + str(0) + " with Player1's move " + str(initMove) + " at board " + str(initBoard))
-    step = 1
-    for i in range(randomDepth-1):
-        if randomState.goal_state() != -1:
-            print("Goal state determined->Winner: " + str(randomState.goal_state()))
-            return -1
-        if step % 2 == 0:
-            randomState = copy.deepcopy(random.choice(randomState.successors()))
-            print("step " + str(step) + " with Player1's move " + str(randomState.action[1]) + " at board " + str(randomState.action[0]))
-        else:
-            randomState = copy.deepcopy(random.choice(randomState.successors()))
-            # randomState = UtttState(parent=randomState, action=(prevMove, num, 1))
-            print("step " + str(step) + " with Player1's move " + str(randomState.action[1]) + " at board " + str(randomState.action[0]))
-        step += 1
+    for i in range(randomDepth):
+        randomState = copy.deepcopy(random.choice(randomState.successors()))
     return randomState
 
 if __name__ == "__main__":
-    randomS = initRandomBoard(40)
+    # initialize a randomBoard given a randomDepth
+    randomS = initRandomBoard(21)
+
+    # print out the board state
     randomS.print_state()
     print("Possible number of moves: " + str(len(randomS.successors())))
-    action = getMove(randomS, searchDepth=10, timeout=timeout)
-    # action = getMCMove(randomS, searchWidth=100, searchDepth=10, timeout=timeout)
-    print("Selected move: " + str(action))
+
+    # # perform Minimax to get next action
+    # action = getMove(randomS, searchDepth=10, timeout=timeout)
+    # print("Selected move: " + str(action))
+
+    # perform Monte Carlo to get next action
     # MCMethod = MonteCarlo(randomS, time=10)
     # print("Selected Move: " + str(MCMethod.get_play()))
 
-    # for i in randomS.successors():
-    #     i.print_state()
-    # randomS2 = initRandomBoard(10)
-    # randomS3 = copy.deepcopy(randomS)
-    # plays = {}
-    # state = []
-    # state.append(randomS)
-    # plays[(0, randomS)] = 1
-    # # print(randomS.parent.currentPlayer)
-    # # print(all(plays.get((0, S)) for S in state))
-    # print(randomS.uniqueID)
-    # print(randomS3.uniqueID)
-    # print((0, randomS) in plays)
+    # init game board for two algorithms to compete
+    initState = UtttState()
+    state = copy.deepcopy(initState)
+    step = 0
+    while state.goal_state() == -1 and state.successors() != []:
+        if step % 2 == 0:
+            MCMethod = MonteCarlo(state, time=10)
+            state = UtttState(parent=state, action=MCMethod.get_play())
+            state.print_state()
+            step += 1
+        else:
+            state = UtttState(parent=state, action=getMove(state, searchDepth=2, timeout=10))
+            state.print_state()
+            step += 1
+        print("Step: " + str(step))
+    state.print_state()
+    print("Winner: " + str(state.goal_state()))
