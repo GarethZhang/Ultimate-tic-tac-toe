@@ -92,8 +92,15 @@ def getMove(utttState, searchDepth=10, timeout=10):
     return nextState.action
 
 def getMCMove(utttState, searchWidth=10, searchDepth=10, timeout=10):
+    # set timeout bound
     startTime = time.time()
     endTime = startTime + timeout
+
+    # initialize variables to store statistics
+    plays = {}
+    wins = {}
+
+    # Childnode of current state
     childSize = len(utttState.successors())
     meanPayout = [1] * childSize
     plays = [1] * childSize
@@ -135,9 +142,25 @@ def initRandomBoard(randomDepth):
     return randomState
 
 if __name__ == "__main__":
-    randomS = initRandomBoard(20)
+    randomS = initRandomBoard(40)
     randomS.print_state()
     print("Possible number of moves: " + str(len(randomS.successors())))
-    # action = getMove(randomS, searchDepth=10, timeout=timeout)
-    action = getMCMove(randomS, searchWidth=100, searchDepth=10, timeout=timeout)
+    action = getMove(randomS, searchDepth=10, timeout=timeout)
+    # action = getMCMove(randomS, searchWidth=100, searchDepth=10, timeout=timeout)
     print("Selected move: " + str(action))
+    # MCMethod = MonteCarlo(randomS, time=10)
+    # print("Selected Move: " + str(MCMethod.get_play()))
+
+    # for i in randomS.successors():
+    #     i.print_state()
+    # randomS2 = initRandomBoard(10)
+    # randomS3 = copy.deepcopy(randomS)
+    # plays = {}
+    # state = []
+    # state.append(randomS)
+    # plays[(0, randomS)] = 1
+    # # print(randomS.parent.currentPlayer)
+    # # print(all(plays.get((0, S)) for S in state))
+    # print(randomS.uniqueID)
+    # print(randomS3.uniqueID)
+    # print((0, randomS) in plays)

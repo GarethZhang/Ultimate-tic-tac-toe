@@ -1,5 +1,8 @@
 import copy
 import numpy as np
+import uuid
+import datetime
+import random
 
 class StateSpace:
     '''Abstract class for defining State spaces for search routines'''
@@ -204,6 +207,7 @@ class UtttState(StateSpace):
                        and the value is a TictactoeState at the position.
         """
         StateSpace.__init__(self, parent, action)
+        self.currentPlayer = action[2]
         self.action = action
         self.parent = parent
         self.boards = boards
@@ -328,10 +332,135 @@ class UtttState(StateSpace):
               + " at position " + str(pos))
         print(self.state_string())
 
-if __name__ == "__main__":
-    # default empty board
-    init_state = UtttState()
-    second_state = UtttState(parent=init_state, action=(1,1,1))
+class MonteCarlo(object):
+    def __init__(self, state, **kwargs):
+        # Takes an instance of a Board and optionally some keyword
+        # arguments.  Initializes the list of game states and the
+        # statistics tables.
+        self.utttState = state
+        self.states = [self.utttState]
+        seconds = kwargs.get('time', 10)
+        self.calculation_time = datetime.timedelta(seconds=seconds)
+        self.max_moves = kwargs.get('max_moves', 100)
+        self.wins = {}
+        self.plays = {}
+        self.C = kwargs.get('C', 1.4)
+        self.nodes = 0
 
-    second_state.print_state()
-    print(len(second_state.successors()))
+    def update(self, state):
+        # Takes a game state, and appends it to the history.
+        self.states.append(state)
+
+    def run_simulation(self):
+        # A bit of an optimization here, so we have a local
+        # variable lookup instead of an attribute access each loop.
+        plays, wins = self.plays, self.wins
+
+        visited_states = set()
+        # Plays out a "random" game from the current position,
+        # then updates the statistics tables with the result.
+        states_copy = self.states[:]
+        state = self.states[-1]
+
+        expand = True
+
+        for t in range(1, self.max_moves + 1):
+            legal = state.successors()
+            moves_states = [state for state in legal]
+            if legal == []:
+                break
+            if all(plays.get((S.action, S.state_string())) for S in moves_states):
+                # If we have stats on all of the legal moves here, use them.
+                log_total = np.log(
+                    sum(plays[(S.action, S.state_string())] for S in moves_states))
+                value, move, state = max(
+                    ((wins[(S.action, S.state_string())] / plays[(S.action, S.state_string())]) +
+                     self.C * np.sqrt(log_total / plays[(S.action, S.state_string())]), S.action, S)
+                    for S in moves_states
+                )
+            else:
+                # Otherwise, just make an arbitrary decision.
+                state = random.choice(moves_states)
+                move = state.action
+                # print(state.state_string() in [S.state_string() for S in son])
+            states_copy.append(state)
+
+            # `player` here and below refers to the player
+            # who moved into that particular state.
+            if expand and (state.action, state.state_string()) not in plays:
+                self.nodes += 1
+                expand = False
+                plays[(state.action, state.state_string())] = 0
+                wins[(state.action, state.state_string())] = 0
+                if t > self.max_depth:
+                    self.max_depth = t
+
+            visited_states.add((state.action, state.state_string()))
+
+            winner = state.goal_state()
+            if winner != -1:
+                # print("Found goal state")
+                break
+
+        for player, state in visited_states:
+            if (player, state) not in self.plays:
+                continue
+            self.plays[(player, state)] += 1
+            if player[2] == winner:
+                self.wins[(player, state)] += 1
+
+    def get_play(self):
+        self.max_depth = 0
+        state = self.states[-1]
+        player = self.utttState.currentPlayer
+        legal = self.utttState.successors()
+
+        # Bail out early if there is no real choice to be made.
+        if not legal:
+            return
+        if len(legal) == 1:
+            return legal[0]
+
+        games = 0
+        begin = datetime.datetime.utcnow()
+        while datetime.datetime.utcnow() - begin < self.calculation_time:
+            self.run_simulation()
+            games += 1
+        moves_states = [state for state in legal]
+        # Display the number of calls of `run_simulation` and the
+        # time elapsed.
+        print(games, self.nodes, datetime.datetime.utcnow() - begin)
+
+        for S in moves_states:
+            print(self.wins.get((S.action, S.state_string())))
+        # Pick the move with the highest percentage of wins.
+        percent_wins, move = max(
+            (self.wins.get((S.action, S.state_string()), 0) /
+             self.plays.get((S.action, S.state_string()), 1),
+             S.action)
+            for S in moves_states
+        )
+
+        # Display the stats for each possible play.
+        for x in sorted(
+                ((100 * self.wins.get((S.action, S.state_string()), 0) /
+                      self.plays.get((S.action, S.state_string()), 1),
+                  self.wins.get((S.action, S.state_string()), 0),
+                  self.plays.get((S.action, S.state_string()), 0), S.action)
+                 for S in moves_states),
+                reverse=True
+        ):
+            print("{3}: {0:.2f}% ({1} / {2})".format(*x))
+
+        print("Maximum depth searched:", self.max_depth)
+
+        return move
+
+if __name__ == "__main__":
+    # # default empty board
+    # init_state = UtttState()
+    # second_state = UtttState(parent=init_state, action=(1,1,1))
+    #
+    # second_state.print_state()
+    # print(len(second_state.successors()))
+    pass
