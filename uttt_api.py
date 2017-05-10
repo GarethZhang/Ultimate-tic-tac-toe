@@ -456,12 +456,3 @@ class MonteCarlo(object):
         print("Maximum depth searched:", self.max_depth)
 
         return move
-
-if __name__ == "__main__":
-    # # default empty board
-    # init_state = UtttState()
-    # second_state = UtttState(parent=init_state, action=(1,1,1))
-    #
-    # second_state.print_state()
-    # print(len(second_state.successors()))
-    pass
